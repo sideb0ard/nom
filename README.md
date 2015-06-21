@@ -1,12 +1,11 @@
 Golang Network Object Muncher
 =============================
 
-Color output stream of network packets.
+Color output stream of network packets.   
 pretty pretty.
 
-requires:
-https://github.com/google/gopacket
-
+requires:  
+https://github.com/google/gopacket  
 https://github.com/mgutz/ansi
 
 e.g.
