@@ -1,18 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
+	"strconv"
 	"strings"
+	"time"
 
-	"github.com/google/gopacket"
-	"github.com/mgutz/ansi"
+	ui "github.com/gizak/termui"
 )
-
-var colors = []string{ansi.ColorCode("red+b:white"), ansi.ColorCode("white+h:blue")}
-var reset = ansi.ColorCode("reset")
-var toggle = 1
 
 var STATE = map[string]string{
 	"01": "ESTABLISHED",
@@ -29,106 +26,139 @@ var STATE = map[string]string{
 	"0C": "NEW_SYN_RECV",
 }
 
-type tcpSocketStatus struct {
-	index         int
-	local_address string
-	rem_address   string
-	status        string
-	tx_q_rx_q     string
-	timer_when    string
-	retransmit    string
-	uid           int
-	timeout       int
-	inode         int
-}
-
 var NETFILES = map[string]string{
 	"tcp":  "/proc/net/tcp",
 	"tcp6": "/proc/net/tcp6",
 }
 
-// func getSocketStatus() []tcpSocketStatus {
-func getSocketStatus() {
+func reverseMap(m map[string]string) map[string]string {
+	n := make(map[string]string)
+	for k, v := range m {
+		n[v] = k
+	}
+	return n
+}
+
+func getSocketStatus(stateChannel chan map[string]int) map[string]int {
 
 	portCounts := make(map[string]int)
 
-	for proto := range NETFILES {
-		infoz, err := ioutil.ReadFile(NETFILES[proto])
-		if err != nil {
-			log.Fatal(err)
+	for {
+		for proto := range NETFILES {
+			infoz, err := ioutil.ReadFile(NETFILES[proto])
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			data := strings.Split(string(infoz), "\n")
+			data = data[1:] // drop title line
+
+			for _, l := range data {
+				if l == "" { // drop empty lines
+					continue
+				}
+
+				d := strings.Fields(l)
+				state := STATE[d[3]]
+
+				_, ok := portCounts[state]
+				if ok {
+					portCounts[state] += 1
+				} else {
+					portCounts[state] = 1
+				}
+			}
 		}
+		stateChannel <- portCounts
+		time.Sleep(time.Second / 2)
+	}
+}
 
-		data := strings.Split(string(infoz), "\n")
-		data = data[1:]
-		for _, l := range data {
-			if l == "" {
-				continue
+func updateSocketStatusData(stateChannel chan map[string]int, spdataz [][]int) {
+	revStates := reverseMap(STATE)
+	for {
+		select {
+		case statez := <-stateChannel:
+			for k, v := range statez {
+				nomnum, _ := strconv.ParseInt(revStates[k], 16, 8)
+				spdataz[nomnum] = append(spdataz[nomnum][1:], v)
 			}
-			d := strings.Fields(l)
-			//idx, _ := strconv.Atoi(d[0])
-			state := STATE[d[3]]
-
-			_, ok := portCounts[state]
-			if ok {
-				portCounts[state] += 1
-			} else {
-				portCounts[state] = 1
-			}
-
-			//ts := tcpSocketStatus{index: idx, local_address: d[1], rem_address: d[2], status: STATE[d[3]]}
-			//fmt.Println(ts)
-
+		default:
 		}
 	}
-	fmt.Println(portCounts)
 }
 
 func main() {
-	getSocketStatus()
-	// flag.Parse()
-	// ifs, err := pcap.FindAllDevs()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// for _, v := range ifs {
-	// 	fmt.Println(v.Name)
-	// }
-	//handle, err := pcap.OpenLive("en0", 65536, true, pcap.BlockForever)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//defer handle.Close()
+	err := ui.Init()
+	if err != nil {
+		panic(err)
+	}
+	defer ui.Close()
+	ui.UseTheme("helloworld")
 
-	//packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	rand.Seed(time.Now().UnixNano())
+	//in := make(chan int)
+	//out := make(chan int, 20)
+	done := make(chan bool)
 
-	//for pkt := range packetSource.Packets() {
-	//	//fmt.Println("Pkt is:", reflect.TypeOf(pkt))
-	//	nom(pkt)
-	//	//eth, _ := layers.LayerTypeEthernet.(*layers.Ethernet)
-	//	//fmt.Println(eth.SrcMac, eth.DstMac)
-	//	//if ethLayer := pkt.Layer(layers.LayerTypeEthernet); ethLayer != nil {
-	//	//	fmt.Println("Ethernet")
-	//	//}
+	p := ui.NewPar(":PRESS q TO QUIT DEMO")
+	p.Height = 3
+	p.Width = 50
+	p.TextFgColor = ui.ColorWhite
+	p.Border.Label = "Socket State Sparklines"
+	p.Border.FgColor = ui.ColorCyan
 
-	//	//if ipLayer := pkt.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-	//	//	fmt.Println("IP")
-	//	//	if tcpLayer := pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-	//	//		// Get actual TCP data from this layer
-	//	//		tcp, _ := tcpLayer.(*layers.TCP)
-	//	//		fmt.Printf("From src port %d to dst port %d\n", tcp.SrcPort, tcp.DstPort)
-	//	//	}
-	//	//}
-	//	//nom(pkt)
-	//	//for _, layer := range pkt.Layers() {
-	//	//	//fmt.Println("PACKET LAYER:", layer.LayerType())
-	//	//	fmt.Println("PACKET LAYER:", reflect.TypeOf(layer))
-	//	//}
-	//}
+	spdataz := make([][]int, len(STATE))
+	for i := 0; i < len(STATE); i++ {
+		for j := 0; j < 100; j++ {
+			spdataz[i] = append(spdataz[i], 0)
+		}
+	}
 
-}
+	var stateChannel = make(chan map[string]int)
 
-func nom(pkt gopacket.Packet) {
-	fmt.Println(colors[toggle], pkt, reset)
-	toggle = 1 - toggle
-	fmt.Println()
+	go getSocketStatus(stateChannel)
+	go updateSocketStatusData(stateChannel, spdataz)
+
+	spStates := []ui.Sparkline{}
+	for i, v := range STATE {
+		spark := ui.Sparkline{}
+		spark.Height = 1
+		spark.Title = v
+		nomnum, _ := strconv.ParseInt(i, 16, 8)
+		spark.Data = spdataz[nomnum-1]
+		spark.LineColor = ui.ColorCyan
+		spark.TitleColor = ui.ColorWhite
+		spStates = append(spStates, spark)
+	}
+
+	sp := ui.NewSparklines(spStates[0], spStates[1], spStates[2], spStates[3], spStates[4], spStates[5], spStates[6], spStates[7], spStates[8], spStates[9], spStates[10], spStates[11])
+	sp.Width = 50
+	sp.Height = 25
+	sp.Border.Label = "Sparkline"
+	sp.Y = 3
+
+	draw := func(t int) {
+		for i := 0; i < len(spdataz); i++ {
+			sp.Lines[i].Data = spdataz[i]
+		}
+		ui.Render(p, sp)
+	}
+
+	evt := ui.EventCh()
+	i := 0
+	for {
+		select {
+		case e := <-evt:
+			if e.Type == ui.EventKey && e.Ch == 'q' {
+				return
+			}
+		default:
+			draw(i)
+			i++
+			time.Sleep(time.Second / 2)
+		}
+	}
+
+	<-done
 }
