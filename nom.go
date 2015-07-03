@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -40,10 +41,8 @@ func reverseMap(m map[string]string) map[string]string {
 }
 
 func getSocketStatus(stateChannel chan map[string]int) map[string]int {
-
-	portCounts := make(map[string]int)
-
 	for {
+		portCounts := make(map[string]int)
 		for proto := range NETFILES {
 			infoz, err := ioutil.ReadFile(NETFILES[proto])
 			if err != nil {
@@ -70,7 +69,7 @@ func getSocketStatus(stateChannel chan map[string]int) map[string]int {
 			}
 		}
 		stateChannel <- portCounts
-		time.Sleep(time.Second / 2)
+		time.Sleep(time.Second / 4)
 	}
 }
 
@@ -78,10 +77,10 @@ func updateSocketStatusData(stateChannel chan map[string]int, spdataz [][]int) {
 	revStates := reverseMap(STATE)
 	for {
 		select {
-		case statez := <-stateChannel:
-			for k, v := range statez {
-				nomnum, _ := strconv.ParseInt(revStates[k], 16, 8)
-				spdataz[nomnum] = append(spdataz[nomnum][1:], v)
+		case portCounts := <-stateChannel:
+			for state, count := range portCounts {
+				nomnum, _ := strconv.ParseInt(revStates[state], 16, 8)
+				spdataz[nomnum-1] = append(spdataz[nomnum-1][1:], count)
 			}
 		default:
 		}
@@ -120,12 +119,20 @@ func main() {
 	go getSocketStatus(stateChannel)
 	go updateSocketStatusData(stateChannel, spdataz)
 
+	skeys := make([]string, len(STATE))
+	i := 0
+	for k, _ := range STATE {
+		skeys[i] = k
+		i++
+	}
+	sort.Strings(skeys)
+
 	spStates := []ui.Sparkline{}
-	for i, v := range STATE {
+	for _, v := range skeys {
 		spark := ui.Sparkline{}
 		spark.Height = 1
-		spark.Title = v
-		nomnum, _ := strconv.ParseInt(i, 16, 8)
+		spark.Title = STATE[v]
+		nomnum, _ := strconv.ParseInt(v, 16, 8)
 		spark.Data = spdataz[nomnum-1]
 		spark.LineColor = ui.ColorCyan
 		spark.TitleColor = ui.ColorWhite
@@ -146,7 +153,7 @@ func main() {
 	}
 
 	evt := ui.EventCh()
-	i := 0
+	j := 0
 	for {
 		select {
 		case e := <-evt:
@@ -155,8 +162,8 @@ func main() {
 			}
 		default:
 			draw(i)
-			i++
-			time.Sleep(time.Second / 2)
+			j++
+			time.Sleep(time.Second / 4)
 		}
 	}
 
