@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"strconv"
@@ -46,28 +45,23 @@ func getIfaceStatus(ifaceStatusChannel chan []map[string]int, timerChannel chan 
 					prevCountIn[iface] = bytesIn
 					prevCountOut[iface] = bytesOut
 				}
-
-				fmt.Println(iface, ":", curCountIn[iface], "bytes/s", curCountOut[iface], "bytes/s")
 			}
 			ifaceStatusChannel <- []map[string]int{curCountIn, curCountOut}
 		}
 	}
 }
 
-// func updateSocketStatusData(stateChannel chan map[string]int, dataz []string) {
-// 	revStates := reverseMap(STATE)
-// 	totalcount := 0
-// 	for {
-// 		select {
-// 		case portCounts := <-stateChannel:
-// 			totalcount = 0
-// 			for state, count := range portCounts {
-// 				nomnum, _ := strconv.ParseInt(revStates[state], 16, 8)
-// 				dataz[nomnum-1] = fmt.Sprintf(state+": %d", count)
-// 				totalcount += count
-// 			}
-// 			dataz[len(dataz)-2] = ""
-// 			dataz[len(dataz)-1] = fmt.Sprintf("TOTAL       : %d", totalcount)
-// 		}
-// 	}
-// }
+func updateIfaceStatusData(ethyChannel chan []map[string]int, dataz []string) {
+	for {
+		select {
+		case ethyCounts := <-ethyChannel:
+			for j := range ethyCounts {
+				//for k, v := range ethyCounts[j] {
+				for _, _ = range ethyCounts[j] {
+					//dataz = append(dataz, fmt.Sprintf(k+"%d", v))
+					dataz = append(dataz, "JOBBIE")
+				}
+			}
+		}
+	}
+}
