@@ -1,14 +1,15 @@
 Golang Network Object Muncher
 =============================
 
-Color output stream of network packets.   
+Color console dashboard displaying network packets, sockets and stats.
 pretty pretty.
 
 requires:  
 https://github.com/google/gopacket  
 https://github.com/mgutz/ansi
+https://github.com/gizak/termui
 
 e.g.
-`for p in mgutz/ansi google/gopacket; do go get $p; done`
+`for p in mgutz/ansi google/gopacket gizak/termui; do go get $p; done`
 
 
