@@ -31,13 +31,12 @@ func main() {
 	var ethyChannel = make(chan []map[string]int)
 	go getIfaceStatus(ethyChannel, timerChannel)
 	// ifaceDataz := make([]map[string]int)
-	ifaceDataz := make([]string, 0)
+	ifaceDataz := make([]string, numIface()*2) // 2 for in and out
 	go updateIfaceStatusData(ethyChannel, ifaceDataz)
-	testDataz := []string{" jobbie", " jobbie"}
 
 	ethy := ui.NewList()
 	ethy.Border.Label = " Interface Traffic Levels"
-	ethy.Items = testDataz
+	ethy.Items = ifaceDataz
 	ethy.Width = 70
 	ethy.Height = 10
 

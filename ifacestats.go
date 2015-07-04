@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"strconv"
@@ -8,6 +9,16 @@ import (
 )
 
 var networkInfoFile = "/proc/net/dev"
+
+func numIface() int {
+	infoz, err := ioutil.ReadFile(networkInfoFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	data := strings.Split(string(infoz), "\n")
+	data = data[2:] // drop title lines
+	return len(data)
+}
 
 func getIfaceStatus(ifaceStatusChannel chan []map[string]int, timerChannel chan int) {
 	prevCountIn := make(map[string]int)
@@ -55,11 +66,11 @@ func updateIfaceStatusData(ethyChannel chan []map[string]int, dataz []string) {
 	for {
 		select {
 		case ethyCounts := <-ethyChannel:
+			i := 0
 			for j := range ethyCounts {
-				//for k, v := range ethyCounts[j] {
-				for _, _ = range ethyCounts[j] {
-					//dataz = append(dataz, fmt.Sprintf(k+"%d", v))
-					dataz = append(dataz, "JOBBIE")
+				for k, v := range ethyCounts[j] {
+					dataz[i] = fmt.Sprintf(k+" : %d", v)
+					i++
 				}
 			}
 		}
