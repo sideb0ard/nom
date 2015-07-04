@@ -21,13 +21,18 @@ func main() {
 	go updateSocketStatusData(stateChannel, portdataz)
 
 	ls := ui.NewList()
-	ls.Border.Label = "Port Status Count"
+	ls.Border.Label = " Port Status Count"
 	ls.Items = portdataz
-	ls.Width = 22
+	// ls.Width = 22
 	ls.Height = len(portdataz) + 2 // 2 for top/bottom border
 
+	ui.Body.AddRows(
+		ui.NewRow(
+			ui.NewCol(3, 0, ls)))
+
 	draw := func() {
-		ui.Render(ls)
+		ui.Body.Align()
+		ui.Render(ui.Body)
 	}
 
 	evt := ui.EventCh()
