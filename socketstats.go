@@ -70,11 +70,11 @@ func updateSocketStatusData(stateChannel chan map[string]int, dataz []string) {
 			totalcount = 0
 			for state, count := range portCounts {
 				nomnum, _ := strconv.ParseInt(revStates[state], 16, 8)
-				dataz[nomnum-1] = fmt.Sprintf(" "+state+": %d", count)
+				dataz[nomnum-1] = fmt.Sprintf("%15s : %10d", state, count)
 				totalcount += count
 			}
 			dataz[len(dataz)-2] = ""
-			dataz[len(dataz)-1] = fmt.Sprintf(" TOTAL       : %d", totalcount)
+			dataz[len(dataz)-1] = fmt.Sprintf("%15s : %10d", "TOTAL", totalcount)
 		}
 	}
 }

@@ -4,11 +4,22 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 )
 
 var networkInfoFile = "/proc/net/dev"
+
+type ifaceTraffic struct {
+	BytesInPerSecond  int
+	BytesOutPerSecond int
+}
+
+func (m *ifaceTraffic) Bytes(bi int, bo int) {
+	m.BytesInPerSecond = bi
+	m.BytesOutPerSecond = bo
+}
 
 func numIface() int {
 	infoz, err := ioutil.ReadFile(networkInfoFile)
@@ -20,11 +31,11 @@ func numIface() int {
 	return len(data)
 }
 
-func getIfaceStatus(ifaceStatusChannel chan []map[string]int, timerChannel chan int) {
+func getIfaceStatus(ifaceChannel chan map[string]*ifaceTraffic, timerChannel chan int) {
 	prevCountIn := make(map[string]int)
 	prevCountOut := make(map[string]int)
-	curCountIn := make(map[string]int)
-	curCountOut := make(map[string]int)
+	ifaceTrafficz := make(map[string]*ifaceTraffic)
+
 	for {
 		select {
 		case _ = <-timerChannel:
@@ -50,29 +61,36 @@ func getIfaceStatus(ifaceStatusChannel chan []map[string]int, timerChannel chan 
 				if !ok {
 					prevCountIn[iface] = bytesIn
 					prevCountOut[iface] = bytesOut
+					ifaceTrafficz[iface] = &ifaceTraffic{}
 				} else {
-					curCountIn[iface] = (bytesIn - prevCountIn[iface]) * 2    // sleep time
-					curCountOut[iface] = (bytesOut - prevCountOut[iface]) * 2 // sleep time
+
+					ifaceTrafficz[iface].Bytes((bytesIn-prevCountIn[iface])*2, (bytesOut-prevCountOut[iface])*2) // TODO: fix *2 to not be static (sleep time)
 					prevCountIn[iface] = bytesIn
 					prevCountOut[iface] = bytesOut
 				}
 			}
-			ifaceStatusChannel <- []map[string]int{curCountIn, curCountOut}
+			ifaceChannel <- ifaceTrafficz
 		}
 	}
 }
 
-func updateIfaceStatusData(ethyChannel chan []map[string]int, dataz []string) {
+func updateIfaceStatusData(ifaceChannel chan map[string]*ifaceTraffic, ifacedataz []string) {
 	for {
 		select {
-		case ethyCounts := <-ethyChannel:
-			i := 0
-			for j := range ethyCounts {
-				for k, v := range ethyCounts[j] {
-					dataz[i] = fmt.Sprintf(k+" : %d", v)
-					i++
-				}
+		case ifaceTrafficz := <-ifaceChannel:
+			keysIF := make([]string, 0, len(ifaceTrafficz)*2)
+			for key, _ := range ifaceTrafficz {
+				keysIF = append(keysIF, key)
 			}
+			sort.Strings(keysIF)
+			i := 0
+			for _, key := range keysIF {
+				ifacedataz[i] = fmt.Sprintf("%15s : %10d Kb/sec Incoming", key, ifaceTrafficz[key].BytesInPerSecond*8/1024)
+				i++
+				ifacedataz[i] = fmt.Sprintf("%15s : %10d Kb/sec Outgoing", key, ifaceTrafficz[key].BytesOutPerSecond*8/1024)
+				i++
+			}
+
 		}
 	}
 }

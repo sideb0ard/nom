@@ -1,9 +1,18 @@
 package main
 
-import ui "github.com/gizak/termui"
+import (
+	"time"
+
+	ui "github.com/gizak/termui"
+)
+
+const (
+	SLEEPTIME = time.Second / 2
+)
 
 func main() {
 
+	// SETUP
 	err := ui.Init()
 	if err != nil {
 		panic(err)
@@ -14,36 +23,42 @@ func main() {
 	var timerChannel = make(chan int)
 	go oldTimer(timerChannel)
 
+	// DATA WORKERS ////////////////////////////
+
 	// Socket Status - two go routines - one to get stats,
 	// other to update data structure for use in widgets
-	var stateChannel = make(chan map[string]int)
-	go getSocketStatus(stateChannel, timerChannel)
-	portdataz := make([]string, len(STATE)+2) // +2 for space and total col
-	go updateSocketStatusData(stateChannel, portdataz)
+	var socketChannel = make(chan map[string]int)
+	go getSocketStatus(socketChannel, timerChannel)
+	socketdataz := make([]string, len(STATE)+2) // +2 for space and total col
+	go updateSocketStatusData(socketChannel, socketdataz)
 
-	ls := ui.NewList()
-	ls.Border.Label = " Port Status Count"
-	ls.Items = portdataz
+	// Interface Traffic Stats
+	var ifaceChannel = make(chan map[string]*ifaceTraffic)
+	go getIfaceStatus(ifaceChannel, timerChannel)
+	ifacedataz := make([]string, numIface()*2)
+	go updateIfaceStatusData(ifaceChannel, ifacedataz)
+
+	// UI Widgets ////////////////////////////
+
+	sockets := ui.NewList()
+	sockets.Border.Label = " Port Status Count"
+	sockets.Items = socketdataz
 	// ls.Width = 22
-	ls.Height = len(portdataz) + 2 // 2 for top/bottom border
+	sockets.Height = len(socketdataz) + 2 // 2 for top/bottom border
 
-	// Inteface Stats - two go routines again, same deal
-	var ethyChannel = make(chan []map[string]int)
-	go getIfaceStatus(ethyChannel, timerChannel)
-	// ifaceDataz := make([]map[string]int)
-	ifaceDataz := make([]string, numIface()*2) // 2 for in and out
-	go updateIfaceStatusData(ethyChannel, ifaceDataz)
+	ifaceTraffic := ui.NewList()
+	ifaceTraffic.Border.Label = " Interface Traffic"
+	ifaceTraffic.Items = ifacedataz
+	// ls.Width = 22
+	ifaceTraffic.Height = len(ifacedataz)
 
-	ethy := ui.NewList()
-	ethy.Border.Label = " Interface Traffic Levels"
-	ethy.Items = ifaceDataz
-	ethy.Width = 70
-	ethy.Height = 10
-
+	// BODY Display
 	ui.Body.AddRows(
 		ui.NewRow(
-			ui.NewCol(3, 0, ls),
-			ui.NewCol(3, 0, ethy)))
+			ui.NewCol(3, 0, sockets),
+			ui.NewCol(3, 0, ifaceTraffic)),
+		ui.NewRow(
+			ui.NewCol(3, 0, ifaceTraffic)))
 
 	draw := func() {
 		ui.Body.Align()
